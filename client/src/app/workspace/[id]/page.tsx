@@ -5,6 +5,8 @@ import { useState, FormEvent } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import api from "@/lib/api";
+import { useAuth } from "@/lib/auth-context";
+import MembersPanel from "@/components/workspace/MembersPanel";
 
 interface Board {
   id: string;
@@ -15,11 +17,16 @@ export default function WorkspacePage() {
   const { id: workspaceId } = useParams<{ id: string }>();
   const queryClient = useQueryClient();
   const [newBoardName, setNewBoardName] = useState("");
+  const { user } = useAuth();
 
   const { data: workspace, isLoading } = useQuery({
     queryKey: ["workspace", workspaceId],
     queryFn: async () => (await api.get(`/workspaces/${workspaceId}`)).data,
   });
+
+  const myMembership = workspace?.members?.find(
+    (m: any) => m.user.id === user?.id,
+  );
 
   const { data: boards } = useQuery<Board[]>({
     queryKey: ["boards", workspaceId],
@@ -67,15 +74,26 @@ export default function WorkspacePage() {
       </form>
 
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
-        {boards?.map((board) => (
-          <Link
-            key={board.id}
-            href={`/board/${board.id}`}
-            className="rounded border bg-white p-6 shadow-sm hover:shadow-md"
-          >
-            {board.name}
-          </Link>
-        ))}
+        <div className="md:col-span-2">
+          {boards?.map((board) => (
+            <Link
+              key={board.id}
+              href={`/board/${board.id}`}
+              className="rounded border bg-white p-6 shadow-sm hover:shadow-md"
+            >
+              {board.name}
+            </Link>
+          ))}
+        </div>
+        <div>
+          {workspace && myMembership && (
+            <MembersPanel
+              workspaceId={workspaceId}
+              members={workspace.members}
+              myRole={myMembership.role}
+            />
+          )}
+        </div>
       </div>
     </div>
   );

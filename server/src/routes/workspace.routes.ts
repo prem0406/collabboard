@@ -37,4 +37,18 @@ router.get(
   boardController.getBoards,
 );
 
+router.patch(
+  "/:workspaceId/members/:memberId",
+  requireWorkspaceMember,
+  requireRole("OWNER", "ADMIN"),
+  workspaceController.updateMemberRole,
+);
+
+router.delete(
+  "/:workspaceId/members/:memberId",
+  requireWorkspaceMember,
+  requireRole("OWNER", "ADMIN"),
+  workspaceController.removeMember,
+);
+
 export default router;

@@ -35,3 +35,10 @@ export interface AttachmentType {
   createdAt: string;
   uploadedBy: { id: string; name: string };
 }
+
+export interface MemberType {
+  id: string;
+  role: "OWNER" | "ADMIN" | "MEMBER";
+  userId: string;
+  user: { id: string; name: string; email: string };
+}

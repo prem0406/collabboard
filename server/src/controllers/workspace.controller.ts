@@ -77,3 +77,75 @@ export async function inviteMember(req: WorkspaceRequest, res: Response) {
 
   res.status(201).json(member);
 }
+
+export async function updateMemberRole(req: WorkspaceRequest, res: Response) {
+  const { workspaceId, memberId } = req.params;
+  const { role } = req.body;
+  const requesterId = req.userId!;
+
+  if (!["OWNER", "ADMIN", "MEMBER"].includes(role)) {
+    return res.status(400).json({ error: "Invalid role" });
+  }
+
+  const targetMember = await prisma.workspaceMember.findUnique({
+    where: { id: memberId },
+  });
+  if (!targetMember || targetMember.workspaceId !== workspaceId) {
+    return res.status(404).json({ error: "Member not found" });
+  }
+
+  // Prevent a workspace from ending up with zero owners
+  if (targetMember.role === "OWNER" && role !== "OWNER") {
+    const ownerCount = await prisma.workspaceMember.count({
+      where: { workspaceId, role: "OWNER" },
+    });
+    if (ownerCount <= 1) {
+      return res
+        .status(400)
+        .json({ error: "Workspace must have at least one owner" });
+    }
+  }
+
+  // Only an OWNER can promote someone to OWNER
+  if (role === "OWNER") {
+    const requester = await prisma.workspaceMember.findUnique({
+      where: { userId_workspaceId: { userId: requesterId, workspaceId } },
+    });
+    if (requester?.role !== "OWNER") {
+      return res
+        .status(403)
+        .json({ error: "Only an owner can grant ownership" });
+    }
+  }
+
+  const updated = await prisma.workspaceMember.update({
+    where: { id: memberId },
+    data: { role },
+  });
+
+  res.json(updated);
+}
+
+export async function removeMember(req: WorkspaceRequest, res: Response) {
+  const { workspaceId, memberId } = req.params;
+
+  const targetMember = await prisma.workspaceMember.findUnique({
+    where: { id: memberId },
+  });
+  if (!targetMember || targetMember.workspaceId !== workspaceId) {
+    return res.status(404).json({ error: "Member not found" });
+  }
+
+  if (targetMember.role === "OWNER") {
+    const ownerCount = await prisma.workspaceMember.count({
+      where: { workspaceId, role: "OWNER" },
+    });
+    if (ownerCount <= 1) {
+      return res.status(400).json({ error: "Cannot remove the last owner" });
+    }
+  }
+
+  await prisma.workspaceMember.delete({ where: { id: memberId } });
+
+  res.status(204).send();
+}
