@@ -19,10 +19,14 @@ import api from "@/lib/api";
 import { BoardType, ListType, CardType } from "@/types/board";
 import BoardList from "@/components/board/BoardList";
 import BoardCard from "@/components/board/BoardCard";
+import { useRef } from "react";
+import { getSocket } from "@/lib/socket";
+import CardDetailModal from "@/components/board/CardDetailModal";
 
 export default function BoardPage() {
   const { id: boardId } = useParams<{ id: string }>();
   const queryClient = useQueryClient();
+  const sourceListIdRef = useRef<string | null>(null);
 
   const { data: board, isLoading } = useQuery<BoardType>({
     queryKey: ["board", boardId],
@@ -35,10 +39,119 @@ export default function BoardPage() {
   const [activeCard, setActiveCard] = useState<CardType | null>(null);
   const [newListName, setNewListName] = useState("");
   const [addingList, setAddingList] = useState(false);
+  const [selectedCard, setSelectedCard] = useState<CardType | null>(null);
 
   useEffect(() => {
     if (board) setLists(board.lists);
   }, [board]);
+
+  useEffect(() => {
+    if (!boardId) return;
+    const socket = getSocket();
+    socket.connect();
+    socket.emit("board:join", boardId);
+
+    socket.on("list:created", ({ list }: { list: ListType }) => {
+      setLists((prev) =>
+        prev.some((l) => l.id === list.id) ? prev : [...prev, list],
+      );
+    });
+
+    socket.on("list:deleted", ({ listId }: { listId: string }) => {
+      setLists((prev) => prev.filter((l) => l.id !== listId));
+    });
+
+    socket.on(
+      "card:created",
+      ({ listId, card }: { listId: string; card: CardType }) => {
+        setLists((prev) =>
+          prev.map((l) =>
+            l.id === listId
+              ? l.cards.some((c) => c.id === card.id)
+                ? l
+                : { ...l, cards: [...l.cards, card] }
+              : l,
+          ),
+        );
+      },
+    );
+
+    socket.on("card:updated", ({ card }: { card: CardType }) => {
+      setLists((prev) =>
+        prev.map((l) =>
+          l.id === card.listId
+            ? { ...l, cards: l.cards.map((c) => (c.id === card.id ? card : c)) }
+            : l,
+        ),
+      );
+    });
+
+    socket.on(
+      "card:deleted",
+      ({ cardId, listId }: { cardId: string; listId: string }) => {
+        setLists((prev) =>
+          prev.map((l) =>
+            l.id === listId
+              ? { ...l, cards: l.cards.filter((c) => c.id !== cardId) }
+              : l,
+          ),
+        );
+      },
+    );
+
+    socket.on(
+      "card:reordered",
+      ({
+        destinationListId,
+        destinationCards,
+        sourceListId,
+        sourceCards,
+      }: {
+        destinationListId: string;
+        destinationCards: CardType[];
+        sourceListId?: string;
+        sourceCards?: CardType[];
+      }) => {
+        setLists((prev) =>
+          prev.map((l) => {
+            if (l.id === destinationListId)
+              return { ...l, cards: destinationCards };
+            if (sourceListId && l.id === sourceListId)
+              return { ...l, cards: sourceCards! };
+            return l;
+          }),
+        );
+      },
+    );
+
+    socket.on("comment:created", ({ cardId }: { cardId: string }) => {
+      queryClient.invalidateQueries({ queryKey: ["comments", cardId] });
+    });
+    socket.on("comment:deleted", ({ cardId }: { cardId: string }) => {
+      queryClient.invalidateQueries({ queryKey: ["comments", cardId] });
+    });
+    socket.on("attachment:created", ({ cardId }: { cardId: string }) => {
+      queryClient.invalidateQueries({ queryKey: ["attachments", cardId] });
+    });
+    socket.on("attachment:deleted", ({ cardId }: { cardId: string }) => {
+      queryClient.invalidateQueries({ queryKey: ["attachments", cardId] });
+    });
+
+    return () => {
+      socket.emit("board:leave", boardId);
+      socket.off("list:created");
+      socket.off("list:deleted");
+      socket.off("card:created");
+      socket.off("card:updated");
+      socket.off("card:deleted");
+      socket.off("card:reordered");
+      socket.off("comment:created");
+      socket.off("comment:deleted");
+      socket.off("attachment:created");
+      socket.off("attachment:deleted");
+      socket.disconnect();
+    };
+  }, [boardId]);
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
@@ -56,6 +169,8 @@ export default function BoardPage() {
       .flatMap((l) => l.cards)
       .find((c) => c.id === event.active.id);
     setActiveCard(card || null);
+    sourceListIdRef.current =
+      findListByCardId(event.active.id as string)?.id || null;
   }
 
   // Fires continuously while dragging — this is what makes a card visually
@@ -92,21 +207,14 @@ export default function BoardPage() {
   }
 
   const reorderMutation = useMutation({
-    mutationFn: async ({
-      cardId,
-      destinationListId,
-      orderedCardIds,
-    }: {
+    mutationFn: async (payload: {
       cardId: string;
       destinationListId: string;
       orderedCardIds: string[];
-    }) =>
-      api.patch(`/cards/${cardId}/reorder`, {
-        destinationListId,
-        orderedCardIds,
-      }),
+      sourceListId?: string;
+      sourceOrderedCardIds?: string[];
+    }) => api.patch(`/cards/${payload.cardId}/reorder`, payload),
     onError: () => {
-      // Server rejected it (or network failed) — resync with source of truth
       queryClient.invalidateQueries({ queryKey: ["board", boardId] });
     },
   });
@@ -118,6 +226,7 @@ export default function BoardPage() {
 
     const activeId = active.id as string;
     const overId = over.id as string;
+    const originalSourceListId = sourceListIdRef.current;
 
     const destList =
       findListByCardId(overId) ||
@@ -125,7 +234,6 @@ export default function BoardPage() {
       findListByCardId(activeId);
     if (!destList) return;
 
-    // Reorder within the final destination list based on where it visually landed
     const cards = [...destList.cards];
     const activeIndex = cards.findIndex((c) => c.id === activeId);
     const overIndex = cards.findIndex((c) => c.id === overId);
@@ -140,10 +248,20 @@ export default function BoardPage() {
       );
     }
 
+    const isCrossList =
+      originalSourceListId && originalSourceListId !== destList.id;
+    const sourceList = isCrossList
+      ? lists.find((l) => l.id === originalSourceListId)
+      : undefined;
+
     reorderMutation.mutate({
       cardId: activeId,
       destinationListId: destList.id,
       orderedCardIds: finalOrder.map((c) => c.id),
+      sourceListId: isCrossList ? originalSourceListId! : undefined,
+      sourceOrderedCardIds: isCrossList
+        ? sourceList?.cards.map((c) => c.id)
+        : undefined,
     });
   }
 
@@ -157,42 +275,20 @@ export default function BoardPage() {
   const addListMutation = useMutation({
     mutationFn: async (name: string) =>
       (await api.post(`/boards/${boardId}/lists`, { name })).data,
-    onSuccess: (newList) => {
-      setLists((prev) => [...prev, { ...newList, cards: [] }]);
-      setNewListName("");
-      setAddingList(false);
-    },
+    onSuccess: () => setNewListName(""),
   });
 
   const addCardMutation = useMutation({
     mutationFn: async ({ listId, title }: { listId: string; title: string }) =>
       (await api.post(`/lists/${listId}/cards`, { title })).data,
-    onSuccess: (newCard, { listId }) => {
-      setLists((prev) =>
-        prev.map((l) =>
-          l.id === listId ? { ...l, cards: [...l.cards, newCard] } : l,
-        ),
-      );
-    },
   });
 
   const deleteCardMutation = useMutation({
     mutationFn: async (cardId: string) => api.delete(`/cards/${cardId}`),
-    onSuccess: (_data, cardId) => {
-      setLists((prev) =>
-        prev.map((l) => ({
-          ...l,
-          cards: l.cards.filter((c) => c.id !== cardId),
-        })),
-      );
-    },
   });
 
   const deleteListMutation = useMutation({
     mutationFn: async (listId: string) => api.delete(`/lists/${listId}`),
-    onSuccess: (_data, listId) => {
-      setLists((prev) => prev.filter((l) => l.id !== listId));
-    },
   });
 
   function handleAddList(e: FormEvent) {
@@ -204,6 +300,12 @@ export default function BoardPage() {
 
   return (
     <div className="flex h-screen flex-col bg-slate-50">
+      {selectedCard && (
+        <CardDetailModal
+          card={selectedCard}
+          onClose={() => setSelectedCard(null)}
+        />
+      )}
       <div className="border-b bg-white p-4">
         <Link
           href="#"
@@ -232,6 +334,7 @@ export default function BoardPage() {
               }
               onDeleteCard={(cardId) => deleteCardMutation.mutate(cardId)}
               onDeleteList={(listId) => deleteListMutation.mutate(listId)}
+              onCardClick={(card) => setSelectedCard(card)}
             />
           ))}
 

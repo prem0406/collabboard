@@ -7,18 +7,20 @@ import {
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
 import BoardCard from "./BoardCard";
-import { ListType } from "@/types/board";
+import { CardType, ListType } from "@/types/board";
 
 export default function BoardList({
   list,
   onAddCard,
   onDeleteCard,
   onDeleteList,
+  onCardClick,
 }: {
   list: ListType;
   onAddCard: (listId: string, title: string) => void;
   onDeleteCard: (cardId: string) => void;
   onDeleteList: (listId: string) => void;
+  onCardClick: (card: CardType) => void;
 }) {
   const [newCardTitle, setNewCardTitle] = useState("");
   const [adding, setAdding] = useState(false);
@@ -55,7 +57,12 @@ export default function BoardList({
           strategy={verticalListSortingStrategy}
         >
           {list.cards.map((card) => (
-            <BoardCard key={card.id} card={card} onDelete={onDeleteCard} />
+            <BoardCard
+              key={card.id}
+              card={card}
+              onDelete={onDeleteCard}
+              onClick={() => onCardClick(card)}
+            />
           ))}
         </SortableContext>
       </div>

@@ -22,6 +22,7 @@ model User {
 
   memberships    WorkspaceMember[]
   comments       Comment[]
+  attachments    Attachment[]
 }
 
 model Workspace {
@@ -71,18 +72,34 @@ model List {
 }
 
 model Card {
-  id          String    @id @default(uuid())
+  id          String       @id @default(uuid())
   title       String
   description String?
-  position    Int        // controls ordering of cards within a list
+  position    Int
 
-  list        List       @relation(fields: [listId], references: [id])
+  list        List         @relation(fields: [listId], references: [id])
   listId      String
 
   comments    Comment[]
+  attachments Attachment[]
 
-  createdAt   DateTime   @default(now())
-  updatedAt   DateTime   @updatedAt
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+}
+
+model Attachment {
+  id         String   @id @default(uuid())
+  filename   String
+  url        String
+  fileSize   Int
+  mimeType   String
+  createdAt  DateTime @default(now())
+
+  card       Card     @relation(fields: [cardId], references: [id])
+  cardId     String
+
+  uploadedBy User     @relation(fields: [uploadedById], references: [id])
+  uploadedById String
 }
 
 model Comment {

@@ -7,9 +7,11 @@ import { CardType } from "@/types/board";
 export default function BoardCard({
   card,
   onDelete,
+  onClick,
 }: {
   card: CardType;
   onDelete: (id: string) => void;
+  onClick: () => void;
 }) {
   const {
     attributes,
@@ -35,6 +37,7 @@ export default function BoardCard({
       style={style}
       {...attributes}
       {...listeners}
+      onClick={onClick}
       className="group mb-2 cursor-grab rounded border bg-white p-3 shadow-sm active:cursor-grabbing"
     >
       <div className="flex items-start justify-between">
