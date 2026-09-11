@@ -3,8 +3,8 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState, FormEvent } from "react";
 import Link from "next/link";
-import api from "@/src/lib/api";
-import { useAuth } from "@/src/lib/auth-context";
+import api from "@/lib/api";
+import { useAuth } from "@/lib/auth-context";
 
 interface Workspace {
   id: string;

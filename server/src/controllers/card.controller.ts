@@ -33,16 +33,44 @@ export async function updateCard(req: WorkspaceRequest, res: Response) {
   res.json(card);
 }
 
-export async function moveCard(req: WorkspaceRequest, res: Response) {
+export async function reorderCard(req: WorkspaceRequest, res: Response) {
   const { cardId } = req.params;
-  const { listId, position } = req.body; // destination list + position
+  const { destinationListId, orderedCardIds } = req.body as {
+    destinationListId: string;
+    orderedCardIds: string[];
+  };
+  const workspaceId = req.workspaceId!;
 
-  const card = await prisma.card.update({
-    where: { id: cardId },
-    data: { listId, position },
+  if (!destinationListId || !Array.isArray(orderedCardIds)) {
+    return res
+      .status(400)
+      .json({ error: "destinationListId and orderedCardIds are required" });
+  }
+
+  const destList = await prisma.list.findUnique({
+    where: { id: destinationListId },
+    select: { board: { select: { workspaceId: true } } },
   });
 
-  res.json(card);
+  if (!destList)
+    return res.status(404).json({ error: "Destination list not found" });
+  if (destList.board.workspaceId !== workspaceId) {
+    return res
+      .status(403)
+      .json({ error: "Cannot move card to a different workspace" });
+  }
+
+  await prisma.$transaction([
+    prisma.card.update({
+      where: { id: cardId },
+      data: { listId: destinationListId },
+    }),
+    ...orderedCardIds.map((id, index) =>
+      prisma.card.update({ where: { id }, data: { position: index } }),
+    ),
+  ]);
+
+  res.json({ success: true });
 }
 
 export async function deleteCard(req: WorkspaceRequest, res: Response) {

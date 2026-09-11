@@ -8,7 +8,7 @@ const router = Router();
 router.use(requireAuth);
 
 router.patch("/:cardId", requireCardAccess, cardController.updateCard);
-router.patch("/:cardId/move", requireCardAccess, cardController.moveCard);
+router.patch("/:cardId/reorder", requireCardAccess, cardController.reorderCard);
 router.delete("/:cardId", requireCardAccess, cardController.deleteCard);
 
 export default router;

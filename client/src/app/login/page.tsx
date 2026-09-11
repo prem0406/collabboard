@@ -2,7 +2,7 @@
 
 import { useState, FormEvent } from "react";
 import Link from "next/link";
-import { useAuth } from "@/src/lib/auth-context";
+import { useAuth } from "@/lib/auth-context";
 
 export default function LoginPage() {
   const { login } = useAuth();
