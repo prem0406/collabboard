@@ -1,13 +1,14 @@
 import { Router } from "express";
 import { requireAuth } from "../middleware/auth.middleware";
+import { requireCardAccess } from "../middleware/workspace-access.middleware";
 import * as cardController from "../controllers/card.controller";
 
 const router = Router();
 
 router.use(requireAuth);
 
-router.patch("/:cardId", cardController.updateCard);
-router.patch("/:cardId/move", cardController.moveCard);
-router.delete("/:cardId", cardController.deleteCard);
+router.patch("/:cardId", requireCardAccess, cardController.updateCard);
+router.patch("/:cardId/move", requireCardAccess, cardController.moveCard);
+router.delete("/:cardId", requireCardAccess, cardController.deleteCard);
 
 export default router;
