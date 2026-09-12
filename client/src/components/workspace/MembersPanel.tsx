@@ -5,6 +5,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import api from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
 import { MemberType } from "@/types/board";
+import { getErrorMessage } from "@/lib/error";
 
 export default function MembersPanel({
   workspaceId,
@@ -35,8 +36,7 @@ export default function MembersPanel({
       setEmail("");
       setError("");
     },
-    onError: (err: any) =>
-      setError(err.response?.data?.error || "Failed to invite"),
+    onError: (err: any) => setError(getErrorMessage(err)),
   });
 
   const updateRole = useMutation({
@@ -49,8 +49,7 @@ export default function MembersPanel({
     }) => api.patch(`/workspaces/${workspaceId}/members/${memberId}`, { role }),
     onSuccess: () =>
       queryClient.invalidateQueries({ queryKey: ["workspace", workspaceId] }),
-    onError: (err: any) =>
-      setError(err.response?.data?.error || "Failed to update role"),
+    onError: (err: any) => setError(getErrorMessage(err)),
   });
 
   const remove = useMutation({
@@ -58,8 +57,7 @@ export default function MembersPanel({
       api.delete(`/workspaces/${workspaceId}/members/${memberId}`),
     onSuccess: () =>
       queryClient.invalidateQueries({ queryKey: ["workspace", workspaceId] }),
-    onError: (err: any) =>
-      setError(err.response?.data?.error || "Failed to remove member"),
+    onError: (err: any) => setError(getErrorMessage(err)),
   });
 
   function handleInvite(e: FormEvent) {

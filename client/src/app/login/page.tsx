@@ -3,6 +3,8 @@
 import { useState, FormEvent } from "react";
 import Link from "next/link";
 import { useAuth } from "@/lib/auth-context";
+import { getErrorMessage } from "@/lib/error";
+import api from "@/lib/api";
 
 export default function LoginPage() {
   const { login } = useAuth();
@@ -18,7 +20,7 @@ export default function LoginPage() {
     try {
       await login(email, password);
     } catch (err: any) {
-      setError(err.response?.data?.error || "Login failed");
+      setError(getErrorMessage(err));
     } finally {
       setLoading(false);
     }

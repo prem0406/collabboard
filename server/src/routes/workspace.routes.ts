@@ -6,12 +6,22 @@ import {
 } from "../middleware/workspace-access.middleware";
 import * as workspaceController from "../controllers/workspace.controller";
 import * as boardController from "../controllers/board.controller";
+import {
+  createBoardSchema,
+  createWorkspaceSchema,
+  inviteMemberSchema,
+} from "../schemas/board.schema";
+import { validate } from "../middleware/validate.middleware";
 
 const router = Router();
 
 router.use(requireAuth);
 
-router.post("/", workspaceController.createWorkspace);
+router.post(
+  "/",
+  validate(createWorkspaceSchema),
+  workspaceController.createWorkspace,
+);
 router.get("/", workspaceController.getMyWorkspaces);
 
 router.get(
@@ -23,12 +33,14 @@ router.post(
   "/:workspaceId/members",
   requireWorkspaceMember,
   requireRole("OWNER", "ADMIN"),
+  validate(inviteMemberSchema),
   workspaceController.inviteMember,
 );
 
 router.post(
   "/:workspaceId/boards",
   requireWorkspaceMember,
+  validate(createBoardSchema),
   boardController.createBoard,
 );
 router.get(

@@ -6,7 +6,7 @@ export function getSocket(): Socket {
   if (!socket) {
     const token = localStorage.getItem("token");
     const socketUrl = process.env.NEXT_PUBLIC_API_URL!.replace("/api", "");
-    socket = io(socketUrl, { auth: { token }, autoConnect: false });
+    socket = io(socketUrl, { withCredentials: true, autoConnect: false });
   }
   return socket;
 }

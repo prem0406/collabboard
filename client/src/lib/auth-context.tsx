@@ -25,31 +25,29 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true);
   const router = useRouter();
 
+  // On mount, ask the server who we are — the cookie (if valid) travels automatically
   useEffect(() => {
-    const stored = localStorage.getItem("user");
-    if (stored) setUser(JSON.parse(stored));
-    setLoading(false);
+    api
+      .get("/auth/me")
+      .then((res) => setUser(res.data.user))
+      .catch(() => setUser(null))
+      .finally(() => setLoading(false));
   }, []);
 
   async function login(email: string, password: string) {
     const res = await api.post("/auth/login", { email, password });
-    localStorage.setItem("token", res.data.token);
-    localStorage.setItem("user", JSON.stringify(res.data.user));
     setUser(res.data.user);
     router.push("/dashboard");
   }
 
   async function register(name: string, email: string, password: string) {
     const res = await api.post("/auth/register", { name, email, password });
-    localStorage.setItem("token", res.data.token);
-    localStorage.setItem("user", JSON.stringify(res.data.user));
     setUser(res.data.user);
     router.push("/dashboard");
   }
 
-  function logout() {
-    localStorage.removeItem("token");
-    localStorage.removeItem("user");
+  async function logout() {
+    await api.post("/auth/logout");
     setUser(null);
     router.push("/login");
   }

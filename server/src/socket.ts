@@ -1,5 +1,7 @@
 import { Server as HTTPServer } from "http";
 import { Server as SocketIOServer, Socket } from "socket.io";
+import { parseCookie } from "cookie";
+
 import jwt from "jsonwebtoken";
 import prisma from "./config/prisma";
 
@@ -13,13 +15,20 @@ let io: SocketIOServer;
 
 export function initSocket(httpServer: HTTPServer) {
   io = new SocketIOServer(httpServer, {
-    cors: { origin: process.env.CLIENT_URL || "http://localhost:3000" },
+    cors: {
+      origin: process.env.CLIENT_URL || "http://localhost:3000",
+      credentials: true,
+    },
   });
 
   // Auth happens once, at connection time — not per-event
   io.use((socket: AuthedSocket, next) => {
-    const token = socket.handshake.auth?.token;
-    if (!token) return next(new Error("No token provided"));
+    const cookieHeader = socket.handshake.headers.cookie;
+    if (!cookieHeader) return next(new Error("No cookie provided"));
+
+    const cookies = parseCookie(cookieHeader);
+    const token = cookies.token;
+    if (!token) return next(new Error("No token in cookie"));
 
     try {
       const decoded = jwt.verify(token, JWT_SECRET) as { userId: string };
