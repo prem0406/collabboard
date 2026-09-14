@@ -5,6 +5,7 @@ const JWT_SECRET = process.env.JWT_SECRET as string;
 
 export interface AuthRequest extends Request {
   userId?: string;
+  params: Record<string, string>; // narrow back from string | string[] — our routes never produce arrays
 }
 
 export function requireAuth(

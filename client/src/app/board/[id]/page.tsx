@@ -381,7 +381,11 @@ export default function BoardPage() {
         <DragOverlay>
           {activeCard ? (
             <div className="w-72">
-              <BoardCard card={activeCard} onDelete={() => {}} />
+              <BoardCard
+                card={activeCard}
+                onDelete={() => {}}
+                onClick={() => setSelectedCard(activeCard)}
+              />
             </div>
           ) : null}
         </DragOverlay>
