@@ -15,3 +15,15 @@ server/uploads/*
 !uploads/.gitkeep
 server/!uploads/.gitkeep
 .env*
+
+# Java / Spring Boot / Maven
+java-backend/target/
+java-backend/build/
+java-backend/bin/
+java-backend/.idea/
+java-backend/.vscode/
+java-backend/*.iml
+java-backend/.classpath
+java-backend/.project
+java-backend/.settings/
+java-backend/hs_err_pid*
